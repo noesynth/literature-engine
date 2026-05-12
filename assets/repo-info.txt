@@ -1,0 +1,3 @@
+name: literature-engine
+
+description: Lightweight skill repository for Claude Code — enforces full-text paper reading via alphaxiv, prevents shallow research from semantic-scholar abstracts alone.
