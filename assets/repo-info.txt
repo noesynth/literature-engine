@@ -1,3 +1,4 @@
 name: literature-engine
+version: 1.0.0
 
-description: Lightweight skill repository for Claude Code — enforces full-text paper reading via alphaxiv, prevents shallow research from semantic-scholar abstracts alone.
+description: Claude Code skill for rigorous academic literature research — enforces full-text reading, prevents shallow abstract-only analysis.

@@ -1,19 +1,22 @@
 # literature-engine
 
-Lightweight skill repository for academic literature research using alphaxiv and semantic-scholar MCP servers.
+**Claude Code skill for rigorous academic literature research — enforces full-text reading, prevents shallow abstract-only analysis.**
 
-## Purpose
+- 📚 **Full-text enforcement** — never settle for abstracts; every research task must read actual papers
+- 🔍 **Dual-source architecture** — alphaxiv for full-text content, semantic-scholar for metadata and citation graphs
+- 🔗 **Citation graph traversal** — trace references and citations to discover related work systematically
+- 🎯 **Smart recommendations** — find similar papers using positive/negative seed papers
+- 📄 **Structured workflows** — three research SOPs (metadata-first, direct full-text, citation tracing)
 
-Provides guidance for Claude Code to:
-- Use **alphaxiv** for full-text paper reading (arXiv only)
-- Use **semantic-scholar** for paper metadata and citation graphs
-- **Enforce** full-text reading — never rely solely on abstracts
+## What is this?
 
-## Installation
+This is a [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code) repository that provides a structured Standard Operating Procedure (SOP) for academic literature research. It orchestrates two MCP servers — **alphaxiv** for reading full paper content and **semantic-scholar** for metadata/citation lookups — into a unified research workflow.
 
-This is a skill-only repository. No npm installation required.
+The core design principle: **semantic-scholar returns only metadata (title, abstract, authors, citations). Completing research with only abstracts is prohibited.** The skill enforces that every research task reads full paper text via alphaxiv before drawing conclusions.
 
-## Usage
+This matters because AI assistants naturally take shortcuts — searching a few papers, reading abstracts, and declaring the research "done." literature-engine prevents this by embedding hard gates that block shallow research patterns.
+
+## Quick Start
 
 ### 1. Configure MCP Servers
 
@@ -30,64 +33,144 @@ Add both MCP servers to your `.mcp.json` or `claude_desktop_config.json`:
       "command": "npx",
       "args": ["@noesynth/semantic-scholar-mcp"],
       "env": {
-        "SS_API_KEY": "<your-key-here>"
+        "SS_API_KEY": "optional-but-recommended"
       }
     }
   }
 }
 ```
 
-**Get API keys:**
-- alphaxiv: No key required (public SSE endpoint)
-- semantic-scholar: [Get key here](https://www.semanticscholar.org/product/api) (optional, increases rate limit from 1 req/s to 100 req/s)
+### 2. Get API Keys
 
-### 2. Use the Skill
+- **alphaxiv**: No key required (public SSE endpoint)
+- **semantic-scholar**: [Get free key here](https://www.semanticscholar.org/product/api) — increases rate limit from 1 req/s to 100 req/s
 
-In Claude Code, invoke the skill:
+### 3. Use the Skill
+
+Invoke in Claude Code:
 
 ```
 /skill literature-search
 ```
 
-Or reference it in your project's `CLAUDE.md`:
+Or reference in your project's `CLAUDE.md`:
 
 ```markdown
 For literature research, use the literature-search skill from literature-engine.
 ```
 
-## Skill Overview
+## How It Works
 
-**Single SOP:** `skills/literature-search/SKILL.md`
+### The Hard Gate
 
-**Key Rule:**
-> semantic-scholar returns ONLY metadata (title, abstract, authors, citations).  
-> You MUST use alphaxiv to read full-text content.  
-> Completing research with only abstracts is PROHIBITED.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HARD GATE: semantic-scholar returns ONLY metadata.             │
+│                                                                 │
+│  If you find papers via relevanceSearch or paper:               │
+│    1. Identify key papers from metadata                         │
+│    2. Read full text via alphaxiv.get_paper_content             │
+│    3. Base analysis on full-text content, NOT abstracts         │
+│                                                                 │
+│  Completing research with only abstracts is PROHIBITED.         │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-**Typical Workflow:**
-1. Discovery: `semantic-scholar.relevanceSearch` to find papers
-2. Selection: Filter by citation count, year, relevance
-3. Deep Reading: `alphaxiv.get_paper_content` for full text
-4. Citation Tracing: `semantic-scholar.citations/references` to expand
+### Research Workflows
 
-## Tools Reference
+**Workflow 1: Metadata-First Search (Recommended)**
 
-### alphaxiv (arXiv papers only)
-- `discover_papers` — semantic search with multi-round retrieval
-- `get_paper_content` — full paper as markdown or AI report
-- `answer_pdf_queries` — ask questions about paper content
-- `read_files_from_github_repository` — read code from paper's repo
+```
+semantic-scholar.relevanceSearch(query)     →  Find papers by keyword
+    ↓ Filter by citation count, year, relevance
+alphaxiv.get_paper_content(arxiv_url)       →  Read full text
+    ↓ Optionally expand
+semantic-scholar.citations/references       →  Trace citation graph
+    ↓ Repeat for promising papers
+```
 
-### semantic-scholar (metadata only)
-- `paper` / `paperBatch` — get paper metadata by ID
-- `relevanceSearch` — keyword search with filters
-- `citations` / `references` — citation graph traversal
-- `recommendations` — find similar papers
-- `author` / `authorPapers` — author info and publications
+**Workflow 2: Direct Full-Text Search**
 
-## Version
+```
+alphaxiv.discover_papers(keywords, question)  →  Semantic search on arXiv
+    ↓
+alphaxiv.get_paper_content(url)               →  Read selected papers
+```
 
-**v0.1.0** — Initial release with alphaxiv + semantic-scholar support
+**Workflow 3: Citation Graph Exploration**
+
+```
+Start with known paper
+    ↓
+semantic-scholar.citations(paper_id)    →  Who cites this?
+semantic-scholar.references(paper_id)   →  What does it cite?
+    ↓ Filter and select
+alphaxiv.get_paper_content              →  Read promising papers
+    ↓ Iterate until sufficient coverage
+```
+
+## Available Tools
+
+### alphaxiv (full-text, arXiv papers only)
+
+| Tool | Purpose |
+|------|---------|
+| `discover_papers` | Semantic search with multi-round retrieval |
+| `get_paper_content` | Full paper as markdown or AI-generated report |
+| `answer_pdf_queries` | Ask specific questions about paper content |
+| `read_files_from_github_repository` | Read code from paper's GitHub repo |
+
+### semantic-scholar (metadata + citation graph)
+
+| Tool | Purpose |
+|------|---------|
+| `paper` / `paperBatch` | Get paper metadata by ID (supports arXiv, DOI, S2 ID, PMID) |
+| `relevanceSearch` | Keyword search with filters (year, field, citations, open access) |
+| `citations` / `references` | Citation graph traversal (incoming/outgoing) |
+| `recommendations` | Find similar papers based on seed papers |
+| `author` / `authorPapers` | Author profiles and publication lists |
+
+## Example Queries
+
+Ask Claude things like:
+
+- *"Survey recent papers on diffusion models for video generation, read the top 5 in full"*
+- *"Find papers that cite Attention Is All You Need and focus on efficient attention — read the most influential ones"*
+- *"What methods does the FlashAttention paper use? Read the full text and explain the IO-awareness approach"*
+- *"Trace the citation graph from the LoRA paper — what adaptations have been proposed since?"*
+- *"Find papers by Tri Dao, read his FlashAttention and Mamba papers, and compare the approaches"*
+
+## Scope and Limitations
+
+**Covered:**
+- arXiv papers (computer science, mathematics, physics, statistics, quantitative biology/finance, electrical engineering)
+- Any paper with metadata in Semantic Scholar (200M+ papers)
+
+**Not covered:**
+- Full-text reading of non-arXiv papers (PubMed, Nature, Cell) — metadata only via semantic-scholar
+- Papers behind paywalls without open access versions
+
+## Project Structure
+
+```
+literature-engine/
+├── skills/
+│   └── literature-search/
+│       └── SKILL.md          # The SOP — full procedure with rules and examples
+├── assets/
+│   └── repo-info.txt         # Repository metadata
+├── README.md                 # This file
+├── LICENSE                   # Apache-2.0
+└── .gitignore
+```
+
+## Links
+
+- 📦 [semantic-scholar MCP](https://www.npmjs.com/package/@noesynth/semantic-scholar-mcp) — the metadata/citation MCP server
+- 🔬 [alphaxiv MCP](https://mcp.alphaxiv.org) — full-text paper reading
+- 📚 [Semantic Scholar API Docs](https://api.semanticscholar.org/api-docs/graph)
+- 🔧 [Model Context Protocol](https://modelcontextprotocol.io)
+- 🧠 [Claude Code Skills](https://docs.anthropic.com/en/docs/claude-code)
 
 ## License
 
