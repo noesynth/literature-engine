@@ -1,211 +1,195 @@
 ---
 name: Literature Search
-description: Unified literature search SOP — alphaxiv for full-text, semantic-scholar for metadata
+description: Medium-depth literature search — read AI-summarized reports for every paper analyzed
 type: sop
 layer: sop
 agents: [alphaxiv, semantic-scholar]
-tools: 
-  alphaxiv: [discover_papers, get_paper_content, answer_pdf_queries, read_files_from_github_repository]
-  semantic-scholar: [paper, paperBatch, references, citations, recommendations, author, authorPapers, relevanceSearch]
-input: query (string), searchMode (metadata | fulltext | hybrid)
-output: PaperResult[] with metadata and/or full content
+tools:
+  alphaxiv: [discover_papers, get_paper_content]
+  semantic-scholar: [relevanceSearch, paper, paperBatch, citations, references]
+input: query (string), scope (survey | gap-analysis | background)
+output: PaperAnalysis[] with metadata + AI summary content
 ---
 
 # Literature Search SOP
 
 ## Layer Rules
 - **Layer**: sop — wraps MCP tools directly
-- **Called by**: Any tactic or strategy requiring literature search
+- **Called by**: Any tactic or strategy requiring literature survey with paper content reading
 - **Calls**: alphaxiv MCP tools, semantic-scholar MCP tools (never calls other SOPs)
 
-## Tool Overview
+## Purpose
 
-### alphaxiv (arXiv papers only)
+Medium-depth reading. Understand methods, contributions, and findings via AI-generated summary reports. Suitable for literature surveys, gap analysis, and building background knowledge.
 
-| Tool | Purpose |
-|------|---------|
-| `discover_papers` | Semantic search with multi-round retrieval, returns ranked papers |
-| `get_paper_content` | Get full paper as markdown or AI-generated report |
-| `answer_pdf_queries` | Ask specific questions about a paper's content |
-| `read_files_from_github_repository` | Read code from paper's GitHub repo |
+Use this when you need to:
+- Conduct a literature survey on a topic
+- Understand what methods exist and how they compare
+- Identify gaps in current research
+- Build background knowledge for a research project
 
-**Scope:** arXiv papers only (computer science, mathematics, physics, statistics, quantitative biology/finance, electrical engineering)
+**This skill reads AI-summarized reports** — not raw full text. For rigorous analysis requiring raw text, use `literature-research`.
 
-**NOT covered:** biomedical, clinical, or life science papers from PubMed, Cell, Nature
+## Tools
 
-### semantic-scholar (metadata only)
+| Tool | Purpose | Returns |
+|------|---------|---------|
+| `alphaxiv.discover_papers` | Primary search — arXiv semantic search | Ranked paper list with metadata |
+| `ss.relevanceSearch` | Supplementary search — non-arXiv papers | Title, abstract, authors, citationCount |
+| `ss.paper / ss.paperBatch` | Metadata enrichment | Citation count, DOI, S2 ID, externalIds |
+| `ss.citations` | Papers that cite this paper (incoming) | Citing paper list with context |
+| `ss.references` | Papers this paper cites (outgoing) | Referenced paper list |
+| `alphaxiv.get_paper_content` | AI summary report (fullText: false) | Structured AI-generated paper report |
 
-| Tool | Purpose |
-|------|---------|
-| `paper` | Get metadata for a single paper (S2 ID, ARXIV:xxx, DOI:xxx, etc.) |
-| `paperBatch` | Batch fetch up to 500 papers |
-| `relevanceSearch` | Keyword search with filters (year, field, citations, open access) |
-| `citations` | Get papers that cite this paper (incoming) |
-| `references` | Get papers this paper cites (outgoing) |
-| `recommendations` | Find similar papers based on seed papers |
-| `author` | Author profile (h-index, affiliations, paper/citation counts) |
-| `authorPapers` | All papers by a specific author |
-
-**Returns:** Title, abstract, authors, year, citation count, paper IDs (S2, arXiv, DOI)
-
-**Does NOT return:** Full paper content, methodology details, results, analysis
-
-## Usage Rules
+## HARD-GATE
 
 <HARD-GATE>
-**semantic-scholar returns ONLY metadata (title, abstract, authors, year, citations).**
+**Do NOT base analysis on abstracts or discover_papers snippets alone.**
 
-**NEVER treat semantic-scholar abstracts as sufficient for research tasks.**
+For EVERY paper selected for analysis, you MUST call:
+```
+alphaxiv.get_paper_content(url: arxiv_url, fullText: false)
+```
 
-If you use `relevanceSearch` or `paper` to find papers, you MUST:
-1. Identify key papers from the metadata
-2. Use `alphaxiv.get_paper_content` to read the full text
-3. Base your analysis on full-text content, not abstracts
+This returns an AI-generated summary report optimized for LLM consumption.
 
-**Completing a research task with only semantic-scholar abstracts is PROHIBITED.**
+**PROHIBITED:**
+- Completing a research task without reading paper content
+- Using only abstracts from ss.relevanceSearch as your evidence
+- Using only discover_papers snippets as your evidence
+- Claiming to understand a paper's methodology from its abstract alone
+
+**REQUIRED:**
+- Call get_paper_content for every paper you analyze
+- Base your analysis on the AI summary report content
+- Minimum 5 papers read via get_paper_content for any survey task
 </HARD-GATE>
 
-## Procedure
+## Workflow
 
-### Workflow 1: Metadata-First Search (Recommended)
+### Step 1: Search
 
-1. **Discovery**: Use `semantic-scholar.relevanceSearch(query, limit, year, min_citation_count)`
-   - Returns: paper metadata with abstracts
-   - Filter by: citation count, year, relevance score
+**Primary (arXiv):**
+```
+alphaxiv.discover_papers(
+  keywords: ["keyword1", "keyword2", "keyword3"],
+  question: "Detailed description of papers needed",
+  difficulty: 5
+)
+```
 
-2. **Selection**: Identify top N papers (typically 5-10) based on:
-   - Relevance to research question
-   - Citation count (indicator of impact)
-   - Recency (if needed)
+**Supplementary (non-arXiv):**
+```
+ss.relevanceSearch(
+  query: "search terms",
+  limit: 20,
+  year: "2022-2024"
+)
+```
 
-3. **Deep Reading**: For each selected paper:
-   - Use `alphaxiv.get_paper_content(url: arxiv_url)` to get full text
-   - Or use `alphaxiv.answer_pdf_queries(url, queries)` for targeted questions
+### Step 2: Enrich Metadata
 
-4. **Citation Tracing** (optional):
-   - Use `semantic-scholar.citations(paper_id)` to find papers that cite it
-   - Use `semantic-scholar.references(paper_id)` to find papers it cites
-   - Repeat steps 2-3 for promising papers from the graph
+For papers found via alphaxiv, enrich with citation data:
+```
+ss.paperBatch(
+  paper_ids: ["ARXIV:2301.xxxxx", "ARXIV:2302.xxxxx", ...]
+)
+```
 
-### Workflow 2: Direct Full-Text Search
+Returns: citationCount, DOI, S2 ID for each paper.
 
-1. **Search**: Use `alphaxiv.discover_papers(keywords, question, difficulty)`
-   - `keywords`: 3-4 concise terms (method names, acronyms, authors)
-   - `question`: Detailed semantic description of desired papers
-   - `difficulty`: 1-10 (higher = more retrieval effort, slower)
+### Step 3: Select Papers
 
-2. **Read**: Use `alphaxiv.get_paper_content(url)` for selected papers
-   - `fullText: false` (default) — AI-generated report (faster, optimized for LLM)
-   - `fullText: true` — raw extracted text (slower, complete content)
+Choose top N papers (typically 5-15) based on:
+- Relevance to research question
+- Citation count (impact indicator)
+- Recency (for fast-moving fields)
+- Diversity of approaches (avoid reading only one school of thought)
 
-### Workflow 3: Citation Graph Exploration
+### Step 4: Read AI Summary Reports
 
-1. **Start**: Begin with a known paper (paperId from semantic-scholar or arXiv URL)
+For each selected paper:
+```
+alphaxiv.get_paper_content(
+  url: "https://arxiv.org/abs/XXXX.XXXXX",
+  fullText: false
+)
+```
 
-2. **Expand**:
-   - Use `semantic-scholar.citations(paper_id, limit, offset)` for incoming citations
-   - Use `semantic-scholar.references(paper_id, limit, offset)` for outgoing references
+`fullText: false` (default) returns an AI-generated intermediate report:
+- Structured summary of contributions
+- Key methods and techniques
+- Main results and findings
+- Optimized for LLM consumption (faster than raw text)
 
-3. **Read**: Use `alphaxiv.get_paper_content` for promising papers from the graph
+### Step 5: Citation Graph Expansion (Optional)
 
-4. **Iterate**: Repeat expansion and reading until sufficient coverage
+To find related work not caught by keyword search:
+```
+ss.citations(paper_id: "ARXIV:XXXX.XXXXX", limit: 50)
+ss.references(paper_id: "ARXIV:XXXX.XXXXX", limit: 50)
+```
+
+Filter results by year and citation count, then repeat Steps 3-4 for promising papers.
 
 ## Tool-Specific Notes
 
-### alphaxiv
+### alphaxiv.get_paper_content
+- `fullText: false` (default) — AI-generated report, faster, structured
+- `fullText: true` — raw extracted text, slower, complete (use in literature-research, not here)
+- Accepts: arXiv URL (`https://arxiv.org/abs/XXXX.XXXXX`), PDF URL, alphaXiv URL
+- Only works for arXiv papers — non-arXiv papers cannot be read via this tool
 
-**ID formats accepted:**
-- arXiv URL: `https://arxiv.org/abs/2307.12307`
-- arXiv PDF: `https://arxiv.org/pdf/2401.12345`
-- alphaXiv URL: `https://alphaxiv.org/overview/2307.12307`
+### ss.paperBatch
+- Max 500 papers per call
+- Auto-prefixes bare arXiv IDs (e.g., `2301.12345` → `ARXIV:2301.12345`)
+- Returns null for papers not found
 
-**get_paper_content options:**
-- `fullText: false` — Returns AI-generated intermediate report (default, faster)
-- `fullText: true` — Returns raw extracted text (slower, complete)
-
-**answer_pdf_queries:**
-- Accepts any PDF URL (not just arXiv)
-- Returns filtered page content as XML
-- Multiple queries on same paper are nearly free (cached)
-
-### semantic-scholar
-
-**ID formats accepted:**
-- S2 ID: `649def34f8be52c8b66281af98ae884c09aef38b`
-- arXiv: `ARXIV:1706.03762` or bare `1706.03762` (auto-prefixed)
-- DOI: `DOI:10.1038/s41586-021-03819-2` or bare `10.xxx/...` (auto-prefixed)
-- PMID: `PMID:12345678`
-- URL: `URL:https://arxiv.org/abs/2307.12307`
-
-**Pagination:**
-- `citations` and `references`: max 1000 results, use `offset` and `limit` for pagination
-- `paperBatch`: max 500 papers per call
-
-**Filters (relevanceSearch):**
-- `year`: "2023-2024", "2020-", "-2023"
-- `fields_of_study`: "Computer Science", "Mathematics", etc.
-- `min_citation_count`: integer threshold
-- `open_access_only`: boolean
-
-## Output Format
-
-Return a structured list of papers with:
-- **Metadata** (from semantic-scholar): title, authors, year, citations, paper IDs
-- **Full Content** (from alphaxiv): markdown text or AI report
-- **Source**: which tool provided which data
-
-Example:
-```json
-{
-  "papers": [
-    {
-      "title": "Attention Is All You Need",
-      "authors": ["Vaswani et al."],
-      "year": 2017,
-      "citationCount": 50000,
-      "paperId": "ARXIV:1706.03762",
-      "abstract": "...",
-      "fullText": "# Attention Is All You Need\n\n## Abstract\n...",
-      "source": {
-        "metadata": "semantic-scholar",
-        "fullText": "alphaxiv"
-      }
-    }
-  ]
-}
-```
-
-## Error Handling
-
-- **Paper not found**: semantic-scholar returns `{ error: "not_found" }`, alphaxiv returns error message
-- **Rate limiting**: Both tools handle retries automatically (429 responses)
-- **Non-arXiv papers**: alphaxiv will fail, use semantic-scholar metadata only (but flag as incomplete)
+### ss.citations / ss.references
+- Max 1000 results per call
+- Use `offset` and `limit` for pagination
+- Includes citation context, intent, and influence flags
 
 ## Examples
 
-### Example 1: Find and read papers on transformers
+### Literature survey: "attention mechanisms in vision transformers"
 
 ```
-1. semantic-scholar.relevanceSearch("transformer attention mechanism", limit=10, year="2023-2024")
-2. Filter top 5 by citation count
-3. For each: alphaxiv.get_paper_content(arxiv_url)
-4. Analyze full-text content
+# Step 1: Search
+alphaxiv.discover_papers(
+  keywords: ["vision transformer", "attention", "ViT"],
+  question: "Papers proposing or analyzing attention mechanisms in vision transformers",
+  difficulty: 5
+)
+ss.relevanceSearch(query: "vision transformer attention mechanism", limit: 15, year: "2022-2024")
+
+# Step 2: Enrich
+ss.paperBatch(paper_ids: ["ARXIV:2010.11929", "ARXIV:2103.14030", ...])
+
+# Step 3: Select top 8 by citation count + relevance
+
+# Step 4: Read each
+alphaxiv.get_paper_content(url: "https://arxiv.org/abs/2010.11929")  # ViT
+alphaxiv.get_paper_content(url: "https://arxiv.org/abs/2103.14030")  # Swin
+# ... repeat for all 8
+
+# Step 5: Expand via citations of ViT
+ss.citations(paper_id: "ARXIV:2010.11929", limit: 30)
 ```
 
-### Example 2: Deep dive on a specific paper
+### Gap analysis: "efficient inference for large language models"
 
 ```
-1. semantic-scholar.paper("ARXIV:1706.03762")  # Get metadata
-2. alphaxiv.get_paper_content("https://arxiv.org/abs/1706.03762")  # Get full text
-3. alphaxiv.answer_pdf_queries(url, ["What is the time complexity?", "How is positional encoding implemented?"])
-```
+# Step 1: Broad search
+alphaxiv.discover_papers(
+  keywords: ["LLM", "efficient inference", "quantization", "pruning"],
+  question: "Methods for making large language model inference faster or cheaper",
+  difficulty: 6
+)
 
-### Example 3: Citation tracing
+# Step 2-4: Enrich, select 10, read AI summaries
 
-```
-1. Start with paper: "ARXIV:1706.03762"
-2. semantic-scholar.citations(paper_id, limit=50)  # Who cites this?
-3. Filter by year >= 2023, citationCount >= 100
-4. For top 10: alphaxiv.get_paper_content(arxiv_url)
-5. Analyze how the original work has been extended
+# Step 5: Check what recent papers cite the seminal works
+ss.citations(paper_id: "ARXIV:2210.17323", limit: 50)  # GPTQ
+ss.citations(paper_id: "ARXIV:2306.00978", limit: 50)  # AWQ
 ```
