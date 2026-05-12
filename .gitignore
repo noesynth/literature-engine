@@ -148,3 +148,5 @@ Thumbs.db
 
 # npm token (contains sensitive credentials)
 .npmrc
+
+docs/
