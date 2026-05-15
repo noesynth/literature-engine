@@ -5,7 +5,7 @@ Use this prompt in a Claude Code session with literature-engine skills to test a
 ## Prerequisites
 
 - alphaxiv MCP configured (SSE: https://mcp.alphaxiv.org)
-- semantic-scholar MCP configured (@noesynth/semantic-scholar-mcp)
+- semantic-scholar MCP configured (@yogsoth-ai/semantic-scholar-mcp)
 - SS_API_KEY recommended for higher rate limits (100 req/s vs 1 req/s)
 
 ## Test Topic

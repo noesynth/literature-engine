@@ -60,7 +60,7 @@ No API key required (public SSE endpoint).
   "mcpServers": {
     "semantic-scholar": {
       "command": "npx",
-      "args": ["@noesynth/semantic-scholar-mcp"],
+      "args": ["@yogsoth-ai/semantic-scholar-mcp"],
       "env": {
         "SS_API_KEY": "<your-key-here>"
       }
