@@ -121,6 +121,6 @@ literature-engine/
 
 **v1.1.0** — Three depth-tiered skills (overview, search, research)
 
-## License
+## 📄 License
 
 [Apache-2.0](LICENSE)
